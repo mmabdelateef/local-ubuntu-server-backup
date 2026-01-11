@@ -171,13 +171,14 @@ If you DON'T want auto-start, change `restart: always` to `restart: unless-stopp
 - NextCloud DB Password: `example`
 
 ### Ports Used
-- 80 - HTTP
-- 443 - HTTPS
+- 80 - HTTP (Traefik)
+- 443 - HTTPS (Traefik)
 - 8080 - Traefik Dashboard (insecure, accessible locally)
 - 9000 - Portainer UI
 - 9999 - NextCloud (direct access)
 - 5678 - n8n (direct access)
 - 53 - Pi-hole DNS (TCP/UDP)
+- 67 - Pi-hole DHCP (UDP)
 
 ### Traefik Dashboard
 Access at: `http://<server-ip>:8080`
@@ -223,6 +224,35 @@ Docker volumes will be created automatically:
    - Verify DNS records point to server
    - Check logs: `docker-compose logs traefik | grep acme`
 
+6. **Pi-hole 502 Bad Gateway**
+
+   If Pi-hole returns 502 Bad Gateway when accessing from outside, this is a network isolation issue. Pi-hole uses a macvlan network for direct LAN access, but Traefik cannot reach containers on macvlan networks from its bridge network.
+
+   **Solution:** Pi-hole must be on BOTH networks:
+   - `default` network - for Traefik connectivity
+   - `pihole_net` (macvlan) - for direct LAN access at 192.168.1.190
+
+   Required labels in docker-compose.yml:
+   ```yaml
+   networks:
+     default:        # Required for Traefik connectivity
+     pihole_net:     # Macvlan for direct LAN access
+       ipv4_address: 192.168.1.190
+   labels:
+     - "traefik.docker.network=traefik_default"  # CRITICAL: Tell Traefik which network to use
+   ```
+
+   Also ensure ports 80/443 are NOT mapped for Pi-hole (Traefik handles external HTTPS traffic).
+
+   **Verify fix:**
+   ```bash
+   # Check Traefik is using the correct IP (should be 172.x.x.x, not 192.168.x.x)
+   curl -s http://localhost:8080/api/http/services | grep -A5 pihole
+
+   # Test connectivity from Traefik container
+   docker exec traefik ping -c 2 <pihole-internal-ip>
+   ```
+
 ## Backup Strategy
 
 To backup this setup again:
@@ -246,4 +276,5 @@ scp -r mostafa@192.168.1.106:/home/mostafa/traefik/letsencrypt ~/Desktop/traefik
 
 ---
 Backup created: 2026-01-11
+Last updated: 2026-01-11 (Pi-hole network fix + redirect middleware)
 Server: 192.168.1.106

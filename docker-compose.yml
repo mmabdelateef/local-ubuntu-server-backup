@@ -7,18 +7,18 @@ services:
 
     # Automatically restart the container if it stops or crashes. This
     # ensures that the service remains available and running, providing
-    # higher availability and resilience for the application. The 
+    # higher availability and resilience for the application. The
     # container will be restarted regardless of the reason it stopped,
     # whether it was due to an error, a manual stop, or a system reboot..
     restart: always
-    
+
     ports:
       - "80:80"          # Expose HTTP
       - "443:443"        # Expose HTTPS
       - "8080:8080"      # Expose Traefik dashboard
-    
-    # Volumes are a mechanism for persisting data generated and used by 
-    # Docker containers, ensuring that data is not lost when containers 
+
+    # Volumes are a mechanism for persisting data generated and used by
+    # Docker containers, ensuring that data is not lost when containers
     # are stopped or removed.
     # Volumes can be used for various purposes, such as:
     # - Sharing data between the host and containers
@@ -31,10 +31,10 @@ services:
       # Mount a local directory (./letsencrypt) to store Let's Encrypt
       # certificates, making it easier to back up and manage SSL/TLS certificates.
       - ./letsencrypt:/letsencrypt
-      
+
       # Mount traefik static configurations
       - ./traefik.config.yml:/etc/traefik/traefik.yml
-    
+
     # Define environment variables for a specific service
     environment:
       - CF_DNS_API_TOKEN=BDJJd2HKJOFZeISUcusxhNyZUXNDLz6heE_jUYrx
@@ -43,8 +43,8 @@ services:
 #   catapp:
 #     image: mikesir87/cats:1.0
 #     labels:
-#       # When traefik.enable=true is set, it instructs Traefik to include this 
-#       # service in its routing configuration. Without this label, Traefik would 
+#       # When traefik.enable=true is set, it instructs Traefik to include this
+#       # service in its routing configuration. Without this label, Traefik would
 #       # ignore the service, and it would not be exposed or routed by Traefik.
 #       - "traefik.enable=true"
 
@@ -113,19 +113,22 @@ services:
       - "traefik.http.services.portainer.loadbalancer.server.port=9000"
 
 # Pi-hole service
+# IMPORTANT: Pi-hole uses a macvlan network for direct LAN access (192.168.1.190)
+# but also needs to be on the default network for Traefik to reach it.
+# The traefik.docker.network label tells Traefik which network to use for routing.
   pihole:
     image: pihole/pihole:latest
     ports:
       - "53:53/tcp"
       - "53:53/udp"
       - "67:67/udp"
-      - "80:80"
-      - "443:443"
+      # NOTE: Ports 80/443 are NOT exposed here - Traefik handles HTTPS traffic
     environment:
       - TZ=Africa/Cairo
       - WEBPASSWORD=M@123
     networks:
-      pihole_net:
+      default:        # Required for Traefik connectivity
+      pihole_net:     # Macvlan for direct LAN access
         ipv4_address: 192.168.1.190
     restart: unless-stopped
     labels:
@@ -135,6 +138,12 @@ services:
       - "traefik.http.routers.pihole.tls=true"
       - "traefik.http.routers.pihole.tls.certresolver=myresolver"
       - "traefik.http.services.pihole.loadbalancer.server.port=80"
+      # CRITICAL: Tell Traefik to use the default network (not macvlan)
+      - "traefik.docker.network=traefik_default"
+      # Redirect root URL to /admin/ for convenience
+      - "traefik.http.middlewares.pihole-redirect.redirectregex.regex=^https://pihole.mabdellateef.fyi/$$"
+      - "traefik.http.middlewares.pihole-redirect.redirectregex.replacement=https://pihole.mabdellateef.fyi/admin/"
+      - "traefik.http.routers.pihole.middlewares=pihole-redirect"
 
 # n8n service
   n8n:
