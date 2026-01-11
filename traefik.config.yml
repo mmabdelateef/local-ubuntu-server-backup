@@ -1,0 +1,54 @@
+################################################################
+# API and dashboard configuration
+################################################################
+api:
+  # Dashboard
+  #
+  #
+  dashboard: true
+  insecure: true
+################################################################
+# Docker configuration backend
+################################################################
+providers:
+  docker:
+    exposedByDefault: true
+################################################################
+# Traefik Logging
+################################################################
+log:
+  level: INFO
+
+################################################################
+# Entrypoint
+################################################################
+entryPoints:
+  web:
+    address: ":80"
+  websecure:
+    address: ":443"
+
+################################################################
+# Challenge DNS
+################################################################
+# certificatesResolvers:
+#   myresolver:
+#     acme:
+#       email: mmabdelateef@gmail.com 
+#       storage: "/acme.json"
+#       dnsChallenge:
+#         provider: cloudflare
+#         delayBeforeCheck: 0
+certificatesResolvers:
+  myresolver:
+    acme:
+      email: "mmabdelateef@gmail.com"
+      storage: "/letsencrypt/acme.json"
+      # Use the production Let's Encrypt directory for real certificates:
+      caServer: "https://acme-v02.api.letsencrypt.org/directory"
+      dnsChallenge:
+        provider: cloudflare
+        # Optional: specify DNS resolvers for the challenge
+        # resolvers:
+        #   - "1.1.1.1:53"
+        
